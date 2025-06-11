@@ -2,14 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const { Pool } = require('pg');
-const axios = require('axios');
+const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL Connection using Render values
+// 🟦 PostgreSQL
 const pool = new Pool({
   user: "adminuser",
   host: "dpg-d13qlbjuibrs73bpbsm0-a.oregon-postgres.render.com",
@@ -18,18 +18,25 @@ const pool = new Pool({
   port: "5432"
 });
 
-// In-Memory OTP Store
+// OTP Memory Store
 let otpStore = {};
 
-//  OTP Generator
 function generateOTP() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-// Send OTP Route
+// AWS SNS Client (v3)
+const snsClient = new SNSClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_KEY
+  }
+});
+
+//  Send OTP via AWS SNS
 app.post('/api/send-otp', async (req, res) => {
   const { mobile } = req.body;
-
   if (!mobile) {
     return res.status(400).send({ success: false, message: "Mobile number is required" });
   }
@@ -38,28 +45,20 @@ app.post('/api/send-otp', async (req, res) => {
   otpStore[mobile] = { otp, expiresAt: Date.now() + 2 * 60 * 1000 };
 
   const message = `Your OTP for NM-ECommerce is ${otp}`;
-  const fast2smsUrl = 'https://www.fast2sms.com/dev/bulkV2';
+  const phoneNumber = `+91${mobile}`;
 
   try {
-    await axios.post(
-      fast2smsUrl,
-      {
-        variables_values: otp,
-        route: "otp",
-        numbers: mobile
-      },
-      {
-        headers: {
-          Authorization: process.env.FAST2SMS_API_KEY,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const command = new PublishCommand({
+      Message: message,
+      PhoneNumber: phoneNumber
+    });
+
+    await snsClient.send(command);
 
     res.send({ success: true, message: "OTP sent successfully" });
   } catch (error) {
-    console.error("SMS Error:", error.response?.data || error.message);
-    res.status(500).send({ success: false, message: "Failed to send OTP" });
+    console.error("SNS Error:", error);
+    res.status(500).send({ success: false, message: "Failed to send OTP via SNS" });
   }
 });
 
@@ -87,7 +86,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// 🔑 Login Route
+//  Login Route
 app.post('/api/login', async (req, res) => {
   const { mobile, password } = req.body;
 
@@ -115,7 +114,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-//  Server Start
+// Server Start
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);

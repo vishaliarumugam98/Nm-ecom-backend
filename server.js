@@ -12,9 +12,9 @@ app.use(express.json());
 // 🟦 PostgreSQL
 const pool = new Pool({
   user: "adminuser",
-  host: "dpg-d13qlbjuibrs73bpbsm0-a.oregon-postgres.render.com",
-  database: "nm_ecommerce_db",
-  password: "8JS5UP23ylvp3GD5QCQNPOHaejuYfwV2",
+  host: "nmecommerce-db.c1e6uys6mw6y.ap-south-1.rds.amazonaws.com",
+  database: "nmecommerce-db",
+  password: "NmEcom#2025",
   port: "5432"
 });
 
@@ -116,6 +116,6 @@ app.post('/api/login', async (req, res) => {
 
 // Server Start
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running at http://0.0.0.0:${PORT}`);
 });
